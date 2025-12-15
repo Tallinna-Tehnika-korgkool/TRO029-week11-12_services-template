@@ -1,0 +1,112 @@
+name: Week 11-12 Task 1 (py_srvcli) - CI in Docker
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  task1_py_srvcli:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build course Docker image (from this repo or main course repo)
+        run: |
+          set -euxo pipefail
+          if [ -f docker/Dockerfile ]; then
+            docker build -t tro029-ci -f docker/Dockerfile docker
+          elif [ -f Dockerfile ]; then
+            docker build -t tro029-ci -f Dockerfile .
+          else
+            # Fallback: build from the main course repository
+            git clone --depth 1 https://github.com/Tallinna-Tehnika-korgkool/TRO029---ROS2-sissejuhatus.git /tmp/tro029-course
+            if [ -f /tmp/tro029-course/docker/Dockerfile ]; then
+              docker build -t tro029-ci -f /tmp/tro029-course/docker/Dockerfile /tmp/tro029-course/docker
+            elif [ -f /tmp/tro029-course/Dockerfile ]; then
+              docker build -t tro029-ci -f /tmp/tro029-course/Dockerfile /tmp/tro029-course
+            else
+              echo "ERROR: Could not find Dockerfile in this repo or in the main course repo."
+              exit 1
+            fi
+          fi
+
+      - name: Build and smoke-test service/client (py_srvcli)
+        run: |
+          set -euxo pipefail
+          docker run --rm             -v "${{ github.workspace }}:/repo"             --entrypoint /bin/bash             --user root             tro029-ci -lc '
+              set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
+
+              # Source ROS 2
+              if [ -f /opt/ros/humble/setup.bash ]; then
+                source /opt/ros/humble/setup.bash
+              else
+                source /opt/ros/${ROS_DISTRO:-humble}/setup.bash
+              fi
+
+              # Ensure tooling exists (best-effort)
+              command -v colcon >/dev/null 2>&1 || (apt-get update && apt-get install -y python3-colcon-common-extensions)
+              command -v rosdep >/dev/null 2>&1 || (apt-get update && apt-get install -y python3-rosdep rsync)
+              command -v rsync >/dev/null 2>&1 || (apt-get update && apt-get install -y rsync)
+
+              rosdep init 2>/dev/null || true
+              rosdep update 2>/dev/null || true
+
+              WS=/tmp/ros2_ws
+              rm -rf "$WS"
+              mkdir -p "$WS/src"
+
+              # Copy repo into staging (exclude .git)
+              rsync -a --exclude ".git" /repo/ "$WS/src/student_repo/"
+
+              # Find py_srvcli by package.xml name
+              PKG_XML=$(grep -Rsl "<name>py_srvcli</name>" "$WS/src/student_repo" | head -n1 || true)
+              if [ -z "$PKG_XML" ]; then
+                echo "ERROR: could not find py_srvcli package.xml (<name>py_srvcli</name>)."
+                echo "Tip: commit your package folder into the repository (recommended path: ros2_ws/src/py_srvcli)."
+                exit 1
+              fi
+              PKG_DIR=$(dirname "$PKG_XML")
+              echo "Found py_srvcli at: $PKG_DIR"
+              cp -a "$PKG_DIR" "$WS/src/py_srvcli"
+
+              cd "$WS"
+              rosdep install -i --from-paths src --rosdistro humble -y --ignore-src 2>/dev/null || true
+              colcon build --packages-select py_srvcli
+              source install/setup.bash
+
+              # Basic file presence checks
+              test -f src/py_srvcli/py_srvcli/service_member_function.py
+              test -f src/py_srvcli/py_srvcli/client_member_function.py
+
+              # Smoke test: start service, call client, verify logs
+              rm -f /tmp/service.log /tmp/client.log
+
+              timeout 10s ros2 run py_srvcli service > /tmp/service.log 2>&1 &
+              SRV_PID=$!
+              sleep 1
+
+              # Client should print 2+3=5
+              timeout 8s ros2 run py_srvcli client 2 3 > /tmp/client.log 2>&1 || true
+
+              sleep 1
+              kill $SRV_PID 2>/dev/null || true
+              wait $SRV_PID 2>/dev/null || true
+
+              echo "--- client.log (tail) ---"
+              tail -n 50 /tmp/client.log || true
+              echo "--- service.log (tail) ---"
+              tail -n 50 /tmp/service.log || true
+
+              grep -Eiq "Result of add_two_ints:.*2 \+ 3 = 5" /tmp/client.log                 || (echo "ERROR: client output did not include expected result (2+3=5)" && exit 1)
+
+              grep -Eiq "Incoming request" /tmp/service.log                 || (echo "ERROR: service did not log Incoming request" && exit 1)
+
+              grep -Eiq "a: 2 b: 3" /tmp/service.log                 || (echo "ERROR: service did not log expected request values (a: 2 b: 3)" && exit 1)
+
+              echo "OK: py_srvcli service/client passed."
+            '
