@@ -244,19 +244,31 @@ ros2 run py_srvcli client 2 3 1
 
 ---
 
-# Esitamine (kohustuslik)
+# Esitamise kord
 
-Sinu GitHub repo peab sisaldama:
-- `ros2_ws/src/tutorial_interfaces/` (msg/, srv/, CMakeLists.txt, package.xml)
-- muudetud `py_pubsub` failid + `package.xml` sõltuvus
-- muudetud `py_srvcli` failid + `package.xml` sõltuvus
-- allpool täidetud “Tulemused” sektsioon
+Harjutuse edukaks esitamiseks **pead töötama oma isiklikus GitHub Classroomi repos**, mis on loodud selle nädala jaoks.
 
-Git:
-```bash
-git status
-git add -A
-git commit -m "Week 11-12: custom interfaces + updates to pubsub and srvcli"
-git push
-```
+1.  **Ava ülesande link Moodle'ist:**
+    - Mine kursuse Moodle'i lehele.
+    - Leia sealt selle nädala (Week 11-12) ülesande juurest link oma isikliku GitHub Classroomi repositooriumi loomiseks.
 
+2.  **Klooni enda isiklik repo GitHubist**, mille nimi sisaldab sinu GitHubi kasutajanime.
+    Näide:
+    ```bash
+    git clone https://github.com/Tallinna-Tehnika-korgkool/TRO029-week11-12_services-<sinu_kasutajanimi>
+    ```
+
+3.  **Tee kõik ülesanded selles kloonitud repos.**
+
+4.  **Lisa ja `commit`'i oma muudatused** (`ros2_ws` kaust koos sinu paketiga).
+    ```bash
+    git add .
+    git commit -m "docs: Complete week 11-12 exercise"
+    git push
+    ```
+
+5.  Kui `push` on tehtud, käivituvad **automaatsed testid** (GitHub Actions) sinu repo **Actions** vahekaardil.
+    - ✅ **Roheline** ✔️ tähendab, et kõik on korras.
+    - ❌ **Punane** ✖️ tähendab, et midagi on puudu või valesti – paranda ja tee uus `commit` ja `push`.
+
+> **NB!** Kui töötad väljaspool oma isiklikku Classroom repo't, siis testid ei tööta ja harjutust ei loeta esitatuks.
