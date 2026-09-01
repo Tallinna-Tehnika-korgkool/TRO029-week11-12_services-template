@@ -230,6 +230,11 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 )
 ```
 
+> ⚠️ **Järjekord on oluline!** Need read pead lisama **enne** rida
+> `ament_package()`, mis on faili lõpus. Kui lisad selle pärast, saad
+> build'i käigus vea `rosidl_generate_interfaces() must be called
+> before ament_package()`.
+
 ## D. Muuda `package.xml` (kohustuslik)
 
 Lisa `<package>` elemendi sisse:
